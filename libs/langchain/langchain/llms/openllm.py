@@ -128,6 +128,7 @@ class OpenLLM(LLM):
         server_url: Optional[str] = None,
         server_type: Literal["grpc", "http"] = "http",
         embedded: bool = True,
+        timeout: int = 30,
         **llm_kwargs: Any,
     ):
         try:
@@ -150,7 +151,7 @@ class OpenLLM(LLM):
                 if server_type == "http"
                 else openllm.client.GrpcClient
             )
-            client = client_cls(server_url)
+            client = client_cls(server_url, timeout=timeout)
 
             super().__init__(
                 **{
