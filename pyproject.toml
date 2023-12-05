@@ -37,6 +37,9 @@ langchain-experimental = { path = "libs/experimental/", develop = true }
 [tool.poetry.group.codespell.dependencies]
 codespell = "^2.2.0"
 
+[tool.setuptools]
+py-modules = []
+
 
 [tool.poetry.group.dev.dependencies]
 langchain-core = { path = "libs/core/", develop = true }
