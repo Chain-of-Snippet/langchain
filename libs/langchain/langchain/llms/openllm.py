@@ -219,7 +219,9 @@ class OpenLLM(LLM):
     def _identifying_params(self) -> IdentifyingParams:
         """Get the identifying parameters."""
         if self._client is not None:
-            self.llm_kwargs.update(self._client._config)
+            for k, v in self._client._config.items():
+                if k not in self.llm_kwargs:
+                    self.llm_kwargs[k] = v
             model_name = self._client._metadata
             model_id = self._client._metadata
         else:
