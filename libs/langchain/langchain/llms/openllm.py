@@ -128,6 +128,7 @@ class OpenLLM(LLM):
         server_url: Optional[str] = None,
         server_type: Literal["grpc", "http"] = "http",
         embedded: bool = True,
+        timeout: int = 30,
         **llm_kwargs: Any,
     ):
         try:
@@ -150,7 +151,7 @@ class OpenLLM(LLM):
                 if server_type == "http"
                 else openllm.client.GrpcClient
             )
-            client = client_cls(server_url)
+            client = client_cls(server_url, timeout=timeout)
 
             super().__init__(
                 **{
@@ -218,9 +219,9 @@ class OpenLLM(LLM):
     def _identifying_params(self) -> IdentifyingParams:
         """Get the identifying parameters."""
         if self._client is not None:
-            self.llm_kwargs.update(self._client._config())
-            model_name = self._client._metadata()["model_name"]
-            model_id = self._client._metadata()["model_id"]
+            self.llm_kwargs.update(self._client._config)
+            model_name = self._client._metadata
+            model_id = self._client._metadata
         else:
             if self._runner is None:
                 raise ValueError("Runner must be initialized.")
@@ -268,7 +269,7 @@ class OpenLLM(LLM):
         if self._client:
             res = self._client.generate(
                 prompt, **config.model_dump(flatten=True)
-            ).responses[0]
+            ).generations[0].text
         else:
             assert self._runner is not None
             res = self._runner(prompt, **config.model_dump(flatten=True))
