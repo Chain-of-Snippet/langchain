@@ -199,31 +199,35 @@ class ChatOpenLLM(BaseChatModel):
             self._identifying_params["model_name"], **copied
         )
 
-        generations = []
-        for message in messages:
-            if self._client:
-                outputs = self._client.chat(
-                    message=message,
-                    stop=stop,
-                    **config.model_dump(flatten=True),
-                ).outputs
-                generations.append(
-                    [ChatGeneration(message=output.text) for output in outputs]
-                )
+        if self._client:
+            outputs = self._client.chat(
+                message=[
+                    {
+                        "role": {"human": "User", "ai": "Chatbot"}[message.role],
+                        "message": message.content,
+                    }
+                    for message in messages
+                ],
+                stop=stop,
+                **config.model_dump(flatten=True),
+            ).outputs
+            generations = [ChatGeneration(message=output.text) for output in outputs]
+        else:
+            raise NotImplementedError
+            
+            assert self._runner is not None
+            res = self._runner(messages, **config.model_dump(flatten=True))
+
+            if isinstance(res, dict) and "text" in res:
+                text = res["text"]
+            elif isinstance(res, str):
+                text = res
             else:
-                assert self._runner is not None
-                res = self._runner(message, **config.model_dump(flatten=True))
+                raise ValueError(
+                    "Expected result to be a dict with key 'text' or a string. "
+                    f"Received {res}"
+                )
 
-                if isinstance(res, dict) and "text" in res:
-                    text = res["text"]
-                elif isinstance(res, str):
-                    text = res
-                else:
-                    raise ValueError(
-                        "Expected result to be a dict with key 'text' or a string. "
-                        f"Received {res}"
-                    )
-
-                generations.append([ChatGeneration(message=text) for output in outputs])
+            generations = [ChatGeneration(message=text) for output in outputs]
 
         return ChatResult(generations=generations)
