@@ -222,8 +222,8 @@ class OpenLLM(LLM):
             for k, v in self._client._config.items():
                 if k not in self.llm_kwargs:
                     self.llm_kwargs[k] = v
-            model_name = self._client._metadata
-            model_id = self._client._metadata
+            model_name = self._client._metadata.model_name
+            model_id = self._client._metadata.model_id
         else:
             if self._runner is None:
                 raise ValueError("Runner must be initialized.")
@@ -271,7 +271,7 @@ class OpenLLM(LLM):
         if self._client:
             res = self._client.generate(
                 prompt, **config.model_dump(flatten=True)
-            ).generations[0].text
+            ).outputs[0].text
         else:
             assert self._runner is not None
             res = self._runner(prompt, **config.model_dump(flatten=True))
