@@ -203,7 +203,7 @@ class ChatOpenLLM(BaseChatModel):
             outputs = self._client.chat(
                 message=[
                     {
-                        "role": {"human": "User", "ai": "Chatbot"}[message.role],
+                        "role": {"human": "User", "ai": "Chatbot"}[message.type],
                         "message": message.content,
                     }
                     for message in messages
@@ -214,7 +214,7 @@ class ChatOpenLLM(BaseChatModel):
             generations = [ChatGeneration(message=output.text) for output in outputs]
         else:
             raise NotImplementedError
-            
+
             assert self._runner is not None
             res = self._runner(messages, **config.model_dump(flatten=True))
 
