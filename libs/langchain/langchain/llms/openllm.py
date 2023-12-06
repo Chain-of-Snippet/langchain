@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import logging
 from typing import (
@@ -15,6 +16,8 @@ from typing import (
     overload,
 )
 
+from langchain_core.language_models.llms import BaseLLM
+from langchain_core.outputs import Generation, LLMResult
 from langchain_core.pydantic_v1 import PrivateAttr
 
 from langchain.callbacks.manager import (
@@ -44,7 +47,7 @@ class IdentifyingParams(TypedDict):
 logger = logging.getLogger(__name__)
 
 
-class OpenLLM(LLM):
+class OpenLLM(BaseLLM):
     """OpenLLM, supporting both in-process model
     instance and remote OpenLLM servers.
 
@@ -248,13 +251,13 @@ class OpenLLM(LLM):
     def _llm_type(self) -> str:
         return "openllm_client" if self._client else "openllm"
 
-    def _call(
+    def _generate(
         self,
-        prompt: str,
+        prompts: List[str],
         stop: Optional[List[str]] = None,
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
-    ) -> str:
+    ) -> LLMResult:
         try:
             import openllm
         except ImportError as e:
@@ -268,22 +271,33 @@ class OpenLLM(LLM):
         config = openllm.AutoConfig.for_model(
             self._identifying_params["model_name"], **copied
         )
-        if self._client:
-            res = self._client.generate(
-                prompt, **config.model_dump(flatten=True)
-            ).outputs[0].text
-        else:
-            assert self._runner is not None
-            res = self._runner(prompt, **config.model_dump(flatten=True))
-        if isinstance(res, dict) and "text" in res:
-            return res["text"]
-        elif isinstance(res, str):
-            return res
-        else:
-            raise ValueError(
-                "Expected result to be a dict with key 'text' or a string. "
-                f"Received {res}"
-            )
+
+        generations = []
+        for prompt in prompts:
+            if self._client:
+                outputs = self._client.generate(
+                    prompt=prompt,
+                    stop=stop,
+                    **config.model_dump(flatten=True),
+                ).outputs
+                generations.append([Generation(text=output.text) for output in outputs])
+            else:
+                assert self._runner is not None
+                res = self._runner(prompt, **config.model_dump(flatten=True))
+
+                if isinstance(res, dict) and "text" in res:
+                    text = res["text"]
+                elif isinstance(res, str):
+                    text = res
+                else:
+                    raise ValueError(
+                        "Expected result to be a dict with key 'text' or a string. "
+                        f"Received {res}"
+                    )
+
+                generations.append([Generation(text=text)])
+
+        return LLMResult(generations=generations)
 
     async def _acall(
         self,
@@ -333,3 +347,22 @@ class OpenLLM(LLM):
                 "Expected result to be a dict with key 'text' or a string. "
                 f"Received {res}"
             )
+
+    async def _agenerate(
+        self,
+        prompts: List[str],
+        stop: Optional[List[str]] = None,
+        run_manager: Optional[AsyncCallbackManagerForLLMRun] = None,
+        **kwargs: Any,
+    ) -> LLMResult:
+        """Run the LLM on the given prompt and input."""
+        generations = []
+        new_arg_supported = inspect.signature(self._acall).parameters.get("run_manager")
+        for prompt in prompts:
+            text = (
+                await self._acall(prompt, stop=stop, run_manager=run_manager, **kwargs)
+                if new_arg_supported
+                else await self._acall(prompt, stop=stop, **kwargs)
+            )
+            generations.append([Generation(text=text)])
+        return LLMResult(generations=generations)
